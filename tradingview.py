@@ -15,7 +15,6 @@ class tradingview:
         print('Getting sessionid from file')
         self.sessionid = None
 
-        # Try to load saved sessionid
         if os.path.exists(SESSION_FILE):
             try:
                 with open(SESSION_FILE, 'r') as f:
@@ -26,7 +25,6 @@ class tradingview:
                 print('Failed to load session file:', e)
                 self.sessionid = None
 
-        # Validate existing sessionid
         if self.sessionid:
             headers = {'cookie': 'sessionid=' + self.sessionid}
             try:
@@ -39,7 +37,6 @@ class tradingview:
                 print('Session validation failed:', e)
                 self.sessionid = None
 
-        # Login if no valid session
         if not self.sessionid:
             username = os.environ.get('username') or os.environ.get('tvusername')
             password = os.environ.get('password') or os.environ.get('tvpassword')
@@ -67,7 +64,6 @@ class tradingview:
 
                 if "sessionid" in cookies:
                     self.sessionid = cookies["sessionid"]
-                    # Save to file
                     with open(SESSION_FILE, 'w') as f:
                         json.dump({"sessionid": self.sessionid}, f)
                     print("✅ Login successful. Sessionid saved.")
@@ -98,45 +94,49 @@ class tradingview:
             'Content-Type': 'application/x-www-form-urlencoded',
             'Cookie': 'sessionid=' + self.sessionid
         }
-        print("Getting access details for pine_id:", pine_id, "username:", username)
+        print("Sending payload to list_users:", user_payload)
 
         usersResponse = requests.post(config.urls['list_users'] +
-                                      '?limit=100&order_by=-created',
+                                      '?limit=10&order_by=-created',
                                       headers=user_headers,
                                       data=user_payload)
-        print("Raw response status:", usersResponse.status_code)
-        print("Raw response body:", usersResponse.text[:500])  # Debug print
+        print("list_users status code:", usersResponse.status_code)
 
         try:
             userResponseJson = usersResponse.json()
-        except:
-            print("Failed to parse JSON")
-            userResponseJson = []
+            print("userResponseJson type:", type(userResponseJson))
+            print("userResponseJson:", userResponseJson)   # ← This is the most important line
 
-        print("Parsed JSON:", userResponseJson)
+            # Handle both old format (dict with 'results') and new format (list)
+            if isinstance(userResponseJson, list):
+                users = userResponseJson
+            else:
+                users = userResponseJson.get('results', [])
 
-        # Handle both old format {"results": [...]} and new format direct list
-        if isinstance(userResponseJson, dict):
-            users = userResponseJson.get('results', [])
-        elif isinstance(userResponseJson, list):
-            users = userResponseJson
-        else:
+            print("Extracted users count:", len(users))
+            print("Extracted users:", users)
+
+        except Exception as e:
+            print("JSON parse error:", str(e))
             users = []
 
-        access_details = {'pine_id': pine_id, 'username': username}
+        access_details = user_payload
         hasAccess = False
         noExpiration = False
         expiration = str(datetime.now(timezone.utc))
 
         for user in users:
-            if isinstance(user, dict) and user.get('username', '').lower() == username.lower():
+            if not isinstance(user, dict):
+                print("Skipping invalid user item:", type(user), user)
+                continue
+
+            if user.get('username', '').lower() == username.lower():
                 hasAccess = True
                 strExpiration = user.get("expiration")
                 if strExpiration is not None:
                     expiration = strExpiration
                 else:
                     noExpiration = True
-                break  # Stop after finding the user
 
         access_details['hasAccess'] = hasAccess
         access_details['noExpiration'] = noExpiration
@@ -154,14 +154,13 @@ class tradingview:
             }
             if extension_type != 'L':
                 expiration = helper.get_access_extension(
-                    access_details['currentExpiration'], extension_type,
-                    extension_length)
+                    access_details['currentExpiration'], extension_type, extension_length)
                 payload['expiration'] = expiration
                 access_details['expiration'] = expiration
             else:
                 access_details['noExpiration'] = True
-            enpoint_type = 'modify_access' if access_details[
-                'hasAccess'] else 'add_access'
+
+            enpoint_type = 'modify_access' if access_details['hasAccess'] else 'add_access'
 
             body, contentType = encode_multipart_formdata(payload)
 
@@ -193,5 +192,4 @@ class tradingview:
         remove_access_response = requests.post(config.urls['remove_access'],
                                                data=body,
                                                headers=headers)
-        access_details['status'] = 'Success' if (remove_access_response.status_code
-                                                 == 200) else 'Failure'
+        access_details['status'] = 'Success' if (remove_access_response.status_code == 200) else 'Failure'
