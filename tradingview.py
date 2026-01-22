@@ -90,7 +90,7 @@ class tradingview:
                 verifiedUserName = user['username']
         return {"validuser": validUser, "verifiedUserName": verifiedUserName}
 
-    def get_access_details(self, username, pine_id):
+        def get_access_details(self, username, pine_id):
         user_payload = {'pine_id': pine_id, 'username': username}
 
         user_headers = {
@@ -98,27 +98,45 @@ class tradingview:
             'Content-Type': 'application/x-www-form-urlencoded',
             'Cookie': 'sessionid=' + self.sessionid
         }
-        print(user_payload)
+        print("Getting access details for pine_id:", pine_id, "username:", username)
+
         usersResponse = requests.post(config.urls['list_users'] +
-                                      '?limit=10&order_by=-created',
+                                      '?limit=100&order_by=-created',
                                       headers=user_headers,
                                       data=user_payload)
-        userResponseJson = usersResponse.json()
-        print(userResponseJson)
-        users = userResponseJson['results']
+        print("Raw response status:", usersResponse.status_code)
+        print("Raw response body:", usersResponse.text[:500])  # Debug print
 
-        access_details = user_payload
+        try:
+            userResponseJson = usersResponse.json()
+        except:
+            print("Failed to parse JSON")
+            userResponseJson = []
+
+        print("Parsed JSON:", userResponseJson)
+
+        # Handle both old format {"results": [...]} and new format direct list
+        if isinstance(userResponseJson, dict):
+            users = userResponseJson.get('results', [])
+        elif isinstance(userResponseJson, list):
+            users = userResponseJson
+        else:
+            users = []
+
+        access_details = {'pine_id': pine_id, 'username': username}
         hasAccess = False
         noExpiration = False
         expiration = str(datetime.now(timezone.utc))
+
         for user in users:
-            if user['username'].lower() == username.lower():
+            if isinstance(user, dict) and user.get('username', '').lower() == username.lower():
                 hasAccess = True
                 strExpiration = user.get("expiration")
                 if strExpiration is not None:
-                    expiration = user['expiration']
+                    expiration = strExpiration
                 else:
                     noExpiration = True
+                break  # Stop after finding the user
 
         access_details['hasAccess'] = hasAccess
         access_details['noExpiration'] = noExpiration
