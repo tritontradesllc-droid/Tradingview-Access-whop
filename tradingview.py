@@ -90,7 +90,7 @@ class tradingview:
                 verifiedUserName = user['username']
         return {"validuser": validUser, "verifiedUserName": verifiedUserName}
 
-        def get_access_details(self, username, pine_id):
+    def get_access_details(self, username, pine_id):
         user_payload = {'pine_id': pine_id, 'username': username}
 
         user_headers = {
