@@ -87,7 +87,6 @@ class tradingview:
         return {"validuser": validUser, "verifiedUserName": verifiedUserName}
 
     def get_access_details(self, username, pine_id):
-        print("=== DEBUG: get_access_details function loaded ===")
         user_payload = {'pine_id': pine_id, 'username': username}
 
         user_headers = {
@@ -106,9 +105,8 @@ class tradingview:
         try:
             userResponseJson = usersResponse.json()
             print("userResponseJson type:", type(userResponseJson))
-            print("userResponseJson:", userResponseJson)   # ← This is the most important line
+            print("userResponseJson:", userResponseJson)
 
-            # Handle both old format (dict with 'results') and new format (list)
             if isinstance(userResponseJson, list):
                 users = userResponseJson
             else:
