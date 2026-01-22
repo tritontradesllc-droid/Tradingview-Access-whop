@@ -87,6 +87,7 @@ class tradingview:
         return {"validuser": validUser, "verifiedUserName": verifiedUserName}
 
     def get_access_details(self, username, pine_id):
+        print("=== DEBUG: get_access_details function loaded ===")
         user_payload = {'pine_id': pine_id, 'username': username}
 
         user_headers = {
